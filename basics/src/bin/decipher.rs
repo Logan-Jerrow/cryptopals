@@ -14,6 +14,11 @@ mod xorcipher {
                 score,
             }
         }
+
+        #[allow(dead_code)]
+        pub fn english(&self) -> &str {
+            &self.english
+        }
     }
 
     impl<'a> PartialEq for XorCipher<'a> {
@@ -45,6 +50,11 @@ fn main() {
     let name = std::env::args().nth(1).expect("no file name given");
     let content = std::fs::read_to_string(name).expect("read failed");
 
+    let best_fit = decipher(&content);
+    println!("{best_fit}")
+}
+
+pub(crate) fn decipher(content: &str) -> xorcipher::XorCipher {
     let mut valid = Vec::new();
     for line in content.lines() {
         if let Some(english) = basics::decipher_single_byte_xor(line) {
@@ -52,6 +62,17 @@ fn main() {
             valid.push(xorcipher::XorCipher::new(line.trim(), english, score));
         }
     }
-    let best_fit = valid.iter().min().unwrap();
-    println!("{best_fit}")
+
+    valid.into_iter().min().unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn jumping() {
+        let file = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/4.txt"));
+        assert_eq!(decipher(file).english(), "Now that the party is jumping\n");
+    }
 }
