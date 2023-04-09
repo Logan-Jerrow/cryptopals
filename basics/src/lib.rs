@@ -3,6 +3,7 @@
 use base64::Engine;
 
 mod set1_chal3;
+mod set1_chal6;
 pub use set1_chal3::score;
 
 pub(crate) trait Xor {
@@ -46,19 +47,6 @@ pub fn decipher_single_byte_xor(input: &str) -> Option<String> {
 
 fn repeate_key_xor(input: &[u8], cipher: &[u8]) -> String {
     hex::encode(String::from_utf8(input.xor(cipher)).unwrap())
-}
-
-fn hamming(this: &[u8], other: &[u8]) -> u32 {
-    let test = this
-        .iter()
-        .zip(other)
-        .map(|(&t, &o)| t ^ o)
-        .collect::<Vec<_>>();
-    dbg!(this.len());
-    dbg!(other.len());
-    println!("{:?}", test);
-
-    42
 }
 
 #[cfg(test)]
@@ -106,10 +94,5 @@ mod tests {
             "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272\
             a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f"
         )
-    }
-
-    #[test]
-    fn hamming_37() {
-        assert_eq!(hamming(b"this is a test", b"wokka wokka!!!"), 37);
     }
 }
