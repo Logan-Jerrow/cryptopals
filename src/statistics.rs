@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use crate::Xor;
-
 // In English, the space character occurs almost twice as frequently than the top letter (⟨e⟩)[16]
 // and the non-alphabetic characters (digits, punctuation, etc.) collectively occupy the fourth
 // position (having already included the space) between ⟨t⟩ and ⟨a⟩.
@@ -70,10 +68,4 @@ fn char_counts(input: &[u8]) -> HashMap<u8, f32> {
     }
 
     table
-}
-
-pub(crate) fn single_byte_xor_cipher(input: &[u8]) -> u8 {
-    (0_u8..=u8::MAX)
-        .min_by_key(|&u| score(&input.xor(&[u])))
-        .unwrap()
 }
