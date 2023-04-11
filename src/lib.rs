@@ -23,3 +23,7 @@ pub fn single_byte_xor(u: &[u8]) -> u8 {
         .min_by_key(|&byte| statistics::score(&u.xor(&[byte])))
         .unwrap()
 }
+
+pub(crate) fn slice_to_string(u: &[u8]) -> String {
+    std::str::from_utf8(u).unwrap().to_string()
+}
