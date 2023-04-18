@@ -1,5 +1,18 @@
 #![allow(unused_variables, dead_code)]
 
+pub(crate) trait EditDistance {
+    fn hamming_weight(&self, other: &[u8]) -> Result<u32, String>;
+}
+
+impl EditDistance for [u8] {
+    fn hamming_weight(&self, other: &[u8]) -> Result<u32, String> {
+        if self.len() != other.len() {
+            return Err("inputs must have the same length".into());
+        }
+        Ok(self.xor(other).iter().fold(0, |a, &u| a + u.count_ones()))
+    }
+}
+
 pub fn encode_base64(u: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(u)
 }
