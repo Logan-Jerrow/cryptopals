@@ -5,6 +5,7 @@ pub fn find_single_english_line(content: &str) -> String {
         .lines()
         .filter_map(|line| crate::decipher_single_byte_xor(&hex::decode(line).unwrap()))
         .min_by_key(|english| statistics::score(english.as_bytes()))
+        // .max_by_key(|english| (100f32 * statistics::cosine_similarity(english.as_bytes())) as u32)
         .unwrap()
 }
 

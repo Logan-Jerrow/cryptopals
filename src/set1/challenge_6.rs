@@ -1,59 +1,43 @@
-//
-const GUESS_RANGE: RangeInclusive<usize> = 2..=40;
-
-fn hamming_distance(a: &[u8], b: &[u8]) -> Option<u32> {
+fn hamming_weight(a: &[u8], b: &[u8]) -> Result<u32, String> {
     if a.len() != b.len() {
-        return None;
+        return Err("inputs must have the same length".into());
     }
-    // print!(
-    //     "{} <> {}:",
-    //     std::str::from_utf8(this).unwrap(),
-    //     std::str::from_utf8(other).unwrap(),
-    // );
-    Some(a.xor(b).iter().fold(0, |a, &u| a + u.count_ones()))
+    Ok(a.xor(b).iter().fold(0, |a, &u| a + u.count_ones()))
 }
 
-fn normaized(hamming: u32, keysize: usize) -> f32 {
-    hamming as f32 / keysize as f32
-}
+fn normaized_hamming_distance(u: &[u8], size: usize) -> f32 {
+    const LENGTH: usize = 4;
+    let chunks = u.chunks_exact(size).take(LENGTH).collect_vec();
+    if chunks.len() != 4 {
+        // f32::INFINITY as u32 == 0
+        return f32::INFINITY;
+    }
 
-fn key_size(input: &[u8]) -> usize {
-    let keysize = GUESS_RANGE
-        .filter_map(|size| {
-            let mut chunk = input.chunks(size);
-            let mut norms = vec![];
-            loop {
-                let Some(a_chunk) = chunk.next() else{break;};
-                let Some(b_chunk) = chunk.next() else{break;};
-                //
-                if let Some(h) = hamming_distance(a_chunk, b_chunk) {
-                    let norm = h as f32 / size as f32;
-                    norms.push(norm);
-                };
-            }
-            norms.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            match !norms.is_empty() {
-                true => Some(norms),
-                false => None,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    let (size, min) = keysize
+    chunks
         .iter()
-        .enumerate()
-        .map(|(i, v)| {
+        .combinations_with_replacement(2)
+        .map(|v| hamming_weight(v[0], v[1]).unwrap())
+        .map(|f| f as f32)
+        .sum::<f32>()
+        / size as f32
+}
+
+fn key_size(input: &[u8]) -> Vec<usize> {
+    const START: usize = 2;
+    const END: usize = 40;
+    let limit = input.len() / 4;
+
+    (START..=END.min(limit))
+        .map(|keysize| {
             (
-                i,
-                v.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap(),
+                keysize,
+                (100_f32 * normaized_hamming_distance(input, keysize)) as u32,
             )
         })
-        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-        .unwrap();
-
-    println!("size: {}\n{min:.3?}\n", size + 2);
-
-    size + 2
+        .sorted_by(|(_, a), (_, b)| a.cmp(b))
+        .take(3)
+        .map(|(size, _)| size)
+        .collect_vec()
 }
 
 // Now transpose the blocks: make a block that is the first byte(u8) of every block, and a block that
@@ -78,73 +62,50 @@ fn solve_blocks(u: Vec<Vec<u8>>) -> Vec<u8> {
 }
 
 pub fn break_vigenere_cipher(u: &[u8]) -> String {
-    let keysize = key_size(u);
-    let tb = transpose_block(u, keysize);
-    let key = solve_blocks(tb);
-    crate::slice_to_string(&u.xor(&key))
+    let mut answers = Vec::new();
+
+    let keysizes = key_size(u);
+    for size in keysizes {
+        //
+        let tb = transpose_block(u, size);
+        let key = solve_blocks(tb);
+        let bytes = u.xor(&key);
+        let english = std::str::from_utf8(&bytes).unwrap().to_string();
+        answers.push(english);
+    }
+    answers
+        .iter()
+        .min_by_key(|s| statistics::score(s.as_bytes()))
+        .unwrap()
+        .to_string()
 }
 
 #[cfg(test)]
 mod tests {
     #[test]
     fn decipher_6() {
-        //
+        let expected = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/6_answer.txt"));
+
         let file = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/6.txt"));
         let input = file.lines().join("");
         let base = decode_base64(input.as_bytes());
+
         let actual = break_vigenere_cipher(&base);
 
-        println!("{}", actual);
-    }
-    #[test]
-    fn break_ice_2() {
-        let expected = "Burning 'em, if you ain't quick and nimble\n\
-            I go crazy when I hear a cymbal";
-        let cipher = b"ICE";
-        let encrypted = hex::decode(
-            "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272\
-            a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f",
-        )
-        .unwrap();
-
-        let actual = break_vigenere_cipher(&encrypted);
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn break_ice() {
-        let answer = "Burning 'em, if you ain't quick and nimble\n\
-            I go crazy when I hear a cymbal";
-        let cipher = b"ICE";
-        let encrypted = hex::decode(
-            "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272\
-            a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f",
-        )
-        .unwrap();
-
-        let keysize = key_size(&encrypted);
-        assert_eq!(keysize, 3);
-
-        let tb = transpose_block(&encrypted, keysize);
-        let key = solve_blocks(tb);
-        assert_eq!(crate::slice_to_string(&key), "ICE");
-        let decrypted = crate::slice_to_string(&encrypted.xor(&key));
-        assert_eq!(decrypted, answer);
+        assert_eq!(actual, expected);
     }
 
     #[test]
     fn hamming_37() {
         assert_eq!(
-            hamming_distance(b"this is a test", b"wokka wokka!!!").unwrap(),
+            hamming_weight(b"this is a test", b"wokka wokka!!!").unwrap(),
             37
         );
     }
 
     use super::*;
-    use crate::{decode_base64, xor::Xor};
-    use itertools::Itertools;
+    use crate::decode_base64;
 }
 
-use crate::Xor;
+use crate::{statistics, Xor};
 use itertools::Itertools;
-use std::ops::RangeInclusive;
