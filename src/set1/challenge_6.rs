@@ -1,39 +1,10 @@
-fn hamming_weight(a: &[u8], b: &[u8]) -> Result<u32, String> {
-    if a.len() != b.len() {
-        return Err("inputs must have the same length".into());
-    }
-    Ok(a.xor(b).iter().fold(0, |a, &u| a + u.count_ones()))
-}
+fn guess_vignere_keysize(buffer: &[u8]) -> Vec<usize> {
+    const MIN_KEYSIZE: usize = 2;
+    const MAX_KEYSIZE: usize = 40;
 
-fn normaized_hamming_distance(u: &[u8], size: usize) -> f32 {
-    const LENGTH: usize = 4;
-    let chunks = u.chunks_exact(size).take(LENGTH).collect_vec();
-    if chunks.len() != 4 {
-        // f32::INFINITY as u32 == 0
-        return f32::INFINITY;
-    }
-
-    chunks
-        .iter()
-        .combinations_with_replacement(2)
-        .map(|v| hamming_weight(v[0], v[1]).unwrap())
-        .map(|f| f as f32)
-        .sum::<f32>()
-        / size as f32
-}
-
-fn key_size(input: &[u8]) -> Vec<usize> {
-    const START: usize = 2;
-    const END: usize = 40;
-    let limit = input.len() / 4;
-
-    (START..=END.min(limit))
-        .map(|keysize| {
-            (
-                keysize,
-                (100_f32 * normaized_hamming_distance(input, keysize)) as u32,
-            )
-        })
+    let limit = buffer.len() / 4;
+    (MIN_KEYSIZE..=MAX_KEYSIZE.min(limit))
+        .map(|size| (size, buffer.normalized_edit_distance(size)))
         .sorted_by(|(_, a), (_, b)| a.cmp(b))
         .take(3)
         .map(|(size, _)| size)
@@ -64,18 +35,19 @@ fn solve_blocks(u: Vec<Vec<u8>>) -> Vec<u8> {
 pub fn break_vigenere_cipher(u: &[u8]) -> String {
     let mut answers = Vec::new();
 
-    let keysizes = key_size(u);
+    let keysizes = guess_vignere_keysize(u);
     for size in keysizes {
-        //
         let tb = transpose_block(u, size);
         let key = solve_blocks(tb);
         let bytes = u.xor(&key);
         let english = std::str::from_utf8(&bytes).unwrap().to_string();
         answers.push(english);
     }
+
     answers
         .iter()
-        .min_by_key(|s| statistics::score(s.as_bytes()))
+        .max_by_key(|s| (100f32 * statistics::cosine_similarity(s.as_bytes())) as u32)
+        // .min_by_key(|s| statistics::score(s.as_bytes()))
         .unwrap()
         .to_string()
 }
@@ -97,15 +69,12 @@ mod tests {
 
     #[test]
     fn hamming_37() {
-        assert_eq!(
-            hamming_weight(b"this is a test", b"wokka wokka!!!").unwrap(),
-            37
-        );
+        assert_eq!(b"this is a test".hamming_weight(b"wokka wokka!!!"), 37);
     }
 
     use super::*;
     use crate::decode_base64;
 }
 
-use crate::{statistics, Xor};
+use crate::{statistics, EditDistance, Xor};
 use itertools::Itertools;

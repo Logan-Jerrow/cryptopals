@@ -1,15 +1,29 @@
 #![allow(unused_variables, dead_code)]
 
 pub(crate) trait EditDistance {
-    fn hamming_weight(&self, other: &[u8]) -> Result<u32, String>;
+    fn hamming_weight(&self, other: &[u8]) -> u32;
+
+    fn normalized_edit_distance(&self, size: usize) -> u32;
 }
 
 impl EditDistance for [u8] {
-    fn hamming_weight(&self, other: &[u8]) -> Result<u32, String> {
+    fn hamming_weight(&self, other: &[u8]) -> u32 {
         if self.len() != other.len() {
-            return Err("inputs must have the same length".into());
+            panic!("inputs must have the same length");
         }
-        Ok(self.xor(other).iter().fold(0, |a, &u| a + u.count_ones()))
+        self.xor(other).iter().fold(0, |a, &u| a + u.count_ones())
+    }
+
+    fn normalized_edit_distance(&self, size: usize) -> u32 {
+        const N_BLOCKS: usize = 8;
+
+        let chunck_size = size * N_BLOCKS;
+        let mut it = self.chunks_exact(chunck_size);
+        let block1 = it.next().unwrap();
+        let block2 = it.next().unwrap();
+
+        let chunk_size = u32::try_from(chunck_size).unwrap();
+        block1.hamming_weight(block2) / chunk_size
     }
 }
 
